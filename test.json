@@ -1,0 +1,7 @@
+{
+    "userId": "1",
+    "videoId": "1",
+    "howMuchWatched": [1-100],
+    "whenLiked": [1-100],
+    "liked": 0-1-null
+}

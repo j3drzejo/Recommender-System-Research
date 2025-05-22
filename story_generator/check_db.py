@@ -7,7 +7,7 @@ cursor = conn.cursor()
 # Execute the query to fetch all videos and labels
 query = '''
 SELECT *
-FROM labels
+FROM videos
 '''
 
 cursor.execute(query)

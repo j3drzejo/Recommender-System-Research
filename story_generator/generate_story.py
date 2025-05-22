@@ -1,63 +1,77 @@
 import ollama
-import ast
+import json
 import sqlite3
+import time
+import os
 
-conn = sqlite3.connect('../db.db')
+# Ensure the directory for the database exists
+db_path = './db.db'
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+# Connect to the database (will create if it doesn't exist)
+conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
-# Create the 'videos' table
-create_videos_table_query = '''
+# Create tables if they don't exist
+cursor.execute('''
 CREATE TABLE IF NOT EXISTS videos (
     videoId INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT NOT NULL
 );
-'''
+''')
 
-# Create the 'labels' table
-create_labels_table_query = '''
+cursor.execute('''
 CREATE TABLE IF NOT EXISTS labels (
     videoId INTEGER,
     label TEXT NOT NULL,
     FOREIGN KEY (videoId) REFERENCES videos(videoId)
 );
-'''
+''')
 
-# Generate response from the AI model
-response = ollama.chat(
-    model='gemma3:4b',
-    messages=[
-        {'role': 'user', 'content': "Write a short reddit-like original story (200–400 words) on a random topic, and generate 10–15 descriptive labels for the story. Output only a valid Python dictionary with exactly two keys: 'story' and 'labels'. 'story': The story string (200–400 words). 'labels': A list of 10–15 descriptive labels (each a single word or short phrase). Use single quotes for all strings (keys and values). Do NOT output any additional text, explanation, or formatting (no JSON, no markdown, no code fences). Ensure the output is valid Python syntax (parsable with eval() or ast.literal_eval())."}
-    ]
+# Prompt for story generation
+prompt = (
+    "Write a short, highly engaging story (200–400 words) in the style of a Reddit post, told in first person by someone "
+    "who personally experienced the events. The narrator's voice must be authentic and casual. The story should be plausible, but can be exaggerated for humor or drama. "
+    "After the story, return a list of 10–15 descriptive labels relevant to the story. "
+    "Output only a valid JSON object with exactly two keys: \"story\" and \"labels\". "
+    "\"story\" must be a string. \"labels\" must be a list of 10–15 strings. "
+    "Do not include any extra text, formatting, or markdown. Only output the raw JSON object."
 )
 
-# Clean up the response string (remove unwanted markdown/code block)
-cleaned_response = response['message']['content'].strip().replace('```python', '').replace('```', '')
+# Generate and store stories
+for i in range(100):  # Change to 100 if needed
+    try:
+        response = ollama.chat(
+            model='gemma3:4b',
+            messages=[{'role': 'user', 'content': prompt}]
+        )
 
-# Parse the cleaned string to get the story and labels
-parsed_response = ast.literal_eval(cleaned_response)
+        content = response['message']['content'].strip()
+        content = content.replace('```json', '').replace('```', '')  # Strip formatting artifacts
 
-story_text = parsed_response['story']
-labels = parsed_response['labels']
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as json_err:
+            print(f"[{i+1}/100] JSON parsing failed: {json_err}")
+            continue
 
-# Step 1: Execute table creation queries
-cursor.execute(create_videos_table_query)
-cursor.execute(create_labels_table_query)
+        story = parsed['story']
+        labels = parsed['labels']
 
-# Step 2: Insert the video and labels data into the database
+        # Insert story
+        cursor.execute('INSERT INTO videos (text) VALUES (?)', (story,))
+        video_id = cursor.lastrowid
 
-# Insert the video story text into the 'videos' table
-cursor.execute('INSERT INTO videos (text) VALUES (?)', (story_text,))
-video_id = cursor.lastrowid  # Get the last inserted videoId
+        # Insert labels
+        for label in labels:
+            cursor.execute('INSERT INTO labels (videoId, label) VALUES (?, ?)', (video_id, label))
 
-# Insert each label into the 'labels' table with the corresponding videoId
-for label in labels:
-    cursor.execute('INSERT INTO labels (videoId, label) VALUES (?, ?)', (video_id, label))
+        print(f"[{i+1}/100] Inserted story with videoId {video_id}")
+        time.sleep(0.5)
 
-# Step 3: Commit the changes and close the connection
+    except Exception as e:
+        print(f"[{i+1}/100] Unexpected error: {e}")
+
+# Finalize
 conn.commit()
 conn.close()
-
-# Optionally print the inserted data to verify
-print(f"Video with ID {video_id} inserted with story: {story_text}")
-for label in labels:
-    print(f"Label for videoId {video_id}: {label}")
