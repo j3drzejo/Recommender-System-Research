@@ -79,7 +79,7 @@ class TwoTowerModel:
             FROM interactions
         ''', conn)
         
-        df_videos = pd.read_sql_query('SELECT videoId FROM videos', conn)
+        df_videos = pd.read_sql_query('SELECT videoId FROM videos WHERE videoId <= 4', conn)
         conn.close()
         
         if df_interactions.empty or df_videos.empty:

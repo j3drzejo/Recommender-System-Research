@@ -18,7 +18,7 @@ class BanditRecommender:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT videoId FROM videos')
+        cursor.execute('SELECT videoId FROM videos WHERE videoId <= 4')
         all_videos = [row[0] for row in cursor.fetchall()]
         
         cursor.execute('SELECT videoId FROM interactions WHERE userId = ?', (user_id,))
