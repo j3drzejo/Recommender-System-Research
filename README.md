@@ -1,5 +1,7 @@
 # 🎥 Video Recommendation System
 
+**A Comparative Analysis of Three Algorithms for Short-Form Content**
+
 ## 📌 Overview
 
 This project explores the effectiveness of three distinct recommendation algorithms for **short-form video content**, comparing:
